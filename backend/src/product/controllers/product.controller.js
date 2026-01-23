@@ -1,196 +1,219 @@
-// Please don't change the pre-written code
-// Import the necessary modules here
-
 import { ErrorHandler } from "../../../utils/errorHandler.js";
+import Product from "../model/product.schema.js";
 import {
-  addNewProductRepo,
-  deleProductRepo,
-  findProductRepo,
-  getAllProductsRepo,
-  getProductDetailsRepo,
-  getTotalCountsOfProduct,
-  updateProductRepo,
+  saveProduct,
+  updateProductById,
+  removeProductById,
+  fetchProductById,
+  countProducts,
 } from "../model/product.repository.js";
-import ProductModel from "../model/product.schema.js";
 
-export const addNewProduct = async (req, res, next) => {
+export const createProduct = async (req, res, next) => {
   try {
-    const product = await addNewProductRepo({
+    const payload = {
       ...req.body,
       createdBy: req.user._id,
+    };
+
+    const created = await saveProduct(payload);
+
+    res.status(201).json({
+      success: true,
+      data: created,
     });
-    if (product) {
-      res.status(201).json({ success: true, product });
-    } else {
-      return next(new ErrorHandler(400, "some error occured!"));
-    }
-  } catch (error) {
-    return next(new ErrorHandler(400, error));
+  } catch (err) {
+    next(new ErrorHandler(400, err.message));
   }
 };
 
-// Implement the functionality for search, filter and pagination this function.
-export const getAllProducts = async (req, res, next) => {
-  const { keyword = "", page = 1, limit = 5 } = req.query;
-
-  const query = {
-    name: { $regex: keyword, $options: "i" },
-  };
-
-  const products = await ProductModel.find(query)
-    .limit(limit * 1)
-    .skip((page - 1) * limit);
-
-  const total = await getTotalCountsOfProduct();
-
-  res.status(200).json({
-    success: true,
-    count: products.length,
-    total,
-    products,
-  });
-};
-
-export const updateProduct = async (req, res, next) => {
+export const fetchProducts = async (req, res, next) => {
   try {
-    const updatedProduct = await updateProductRepo(req.params.id, req.body);
-    if (updatedProduct) {
-      res.status(200).json({ success: true, updatedProduct });
-    } else {
-      return next(new ErrorHandler(400, "Product not found!"));
-    }
-  } catch (error) {
-    return next(new ErrorHandler(400, error));
+    const keyword = req.query.keyword || "";
+    const page = Number(req.query.page) || 1;
+    const limit = Number(req.query.limit) || 5;
+
+    const filter = {
+      name: { $regex: keyword, $options: "i" },
+    };
+
+    const products = await Product.find(filter)
+      .limit(limit)
+      .skip((page - 1) * limit);
+
+    const total = await countProducts();
+
+    res.status(200).json({
+      success: true,
+      count: products.length,
+      total,
+      products,
+    });
+  } catch (err) {
+    next(new ErrorHandler(500, err.message));
   }
 };
 
-export const deleteProduct = async (req, res, next) => {
+export const modifyProduct = async (req, res, next) => {
   try {
-    const deletedProduct = await deleProductRepo(req.params.id);
-    if (deletedProduct) {
-      res.status(200).json({ success: true, deletedProduct });
-    } else {
-      return next(new ErrorHandler(400, "Product not found!"));
+    const updated = await updateProductById(req.params.id, req.body);
+
+    if (!updated) {
+      return next(new ErrorHandler(404, "product not found"));
     }
-  } catch (error) {
-    return next(new ErrorHandler(400, error));
+
+    res.status(200).json({
+      success: true,
+      updated,
+    });
+  } catch (err) {
+    next(new ErrorHandler(400, err.message));
   }
 };
 
-export const getProductDetails = async (req, res, next) => {
+export const removeProduct = async (req, res, next) => {
   try {
-    const productDetails = await getProductDetailsRepo(req.params.id);
-    if (productDetails) {
-      res.status(200).json({ success: true, productDetails });
-    } else {
-      return next(new ErrorHandler(400, "Product not found!"));
+    const removed = await removeProductById(req.params.id);
+
+    if (!removed) {
+      return next(new ErrorHandler(404, "product not found"));
     }
-  } catch (error) {
-    return next(new ErrorHandler(400, error));
+
+    res.status(200).json({
+      success: true,
+      removed,
+    });
+  } catch (err) {
+    next(new ErrorHandler(400, err.message));
   }
 };
 
-export const rateProduct = async (req, res, next) => {
+export const fetchProductDetails = async (req, res, next) => {
   try {
-    const productId = req.params.id;
+    const product = await fetchProductById(req.params.id);
+
+    if (!product) {
+      return next(new ErrorHandler(404, "product not found"));
+    }
+
+    res.status(200).json({
+      success: true,
+      product,
+    });
+  } catch (err) {
+    next(new ErrorHandler(400, err.message));
+  }
+};
+
+export const submitReview = async (req, res, next) => {
+  try {
     const { rating, comment } = req.body;
-    const user = req.user._id;
-    const name = req.user.name;
+
+    if (!rating) {
+      return next(new ErrorHandler(400, "rating is required"));
+    }
+
+    const product = await fetchProductById(req.params.id);
+    if (!product) {
+      return next(new ErrorHandler(404, "product not found"));
+    }
+
+    const userId = req.user._id.toString();
+
+    const index = product.reviews.findIndex(
+      (r) => r.user.toString() === userId
+    );
+
     const review = {
-      user,
-      name,
+      user: userId,
+      name: req.user.name,
       rating: Number(rating),
       comment,
     };
-    if (!rating) {
-      return next(new ErrorHandler(400, "rating can't be empty"));
-    }
-    const product = await findProductRepo(productId);
-    if (!product) {
-      return next(new ErrorHandler(400, "Product not found!"));
-    }
-    const findRevieweIndex = product.reviews.findIndex((rev) => {
-      return rev.user.toString() === user.toString();
-    });
-    if (findRevieweIndex >= 0) {
-      product.reviews.splice(findRevieweIndex, 1, review);
+
+    if (index >= 0) {
+      product.reviews[index] = review;
     } else {
       product.reviews.push(review);
     }
-    let avgRating = 0;
-    product.reviews.forEach((rev) => {
-      avgRating += rev.rating;
-    });
-    const updatedRatingOfProduct = avgRating / product.reviews.length;
-    product.rating = updatedRatingOfProduct;
+
+    const totalRating = product.reviews.reduce(
+      (sum, r) => sum + r.rating,
+      0
+    );
+
+    product.rating = totalRating / product.reviews.length;
+    product.numOfReviews = product.reviews.length;
+
     await product.save({ validateBeforeSave: false });
-    res
-      .status(201)
-      .json({ success: true, msg: "thx for rating the product", product });
-  } catch (error) {
-    return next(new ErrorHandler(500, error));
+
+    res.status(201).json({
+      success: true,
+      product,
+    });
+  } catch (err) {
+    next(new ErrorHandler(500, err.message));
   }
 };
 
-export const getAllReviewsOfAProduct = async (req, res, next) => {
+export const fetchProductReviews = async (req, res, next) => {
   try {
-    const product = await findProductRepo(req.params.id);
+    const product = await fetchProductById(req.params.id);
+
     if (!product) {
-      return next(new ErrorHandler(400, "Product not found!"));
+      return next(new ErrorHandler(404, "product not found"));
     }
-    res.status(200).json({ success: true, reviews: product.reviews });
-  } catch (error) {
-    return next(new ErrorHandler(400, error));
+
+    res.status(200).json({
+      success: true,
+      reviews: product.reviews,
+    });
+  } catch (err) {
+    next(new ErrorHandler(400, err.message));
   }
 };
 
-export const deleteReview = async (req, res, next) => {
+export const removeReview = async (req, res, next) => {
   try {
     const { productId, reviewId } = req.query;
 
-    // ... basic checks stay the same ...
+    const product = await fetchProductById(productId);
+    if (!product) {
+      return next(new ErrorHandler(404, "product not found"));
+    }
 
-    const product = await findProductRepo(productId);
-    if (!product) return next(new ErrorHandler(400, "Product not found!"));
-
-    const reviews = product.reviews;
-
-    const isReviewExistIndex = reviews.findIndex((rev) =>
-      rev._id.toString() === reviewId.toString()
+    const index = product.reviews.findIndex(
+      (r) => r._id.toString() === reviewId
     );
 
-    if (isReviewExistIndex < 0) {
-      return next(new ErrorHandler(400, "review doesn't exist"));
+    if (index === -1) {
+      return next(new ErrorHandler(404, "review not found"));
     }
 
-    const reviewToBeDeleted = reviews[isReviewExistIndex];
-
-    // 1. ALWAYS check permission BEFORE modifying the array
-    if (reviewToBeDeleted.user.toString() !== req.user._id.toString()) {
-      return next(new ErrorHandler(403, "not allowed"));
+    if (product.reviews[index].user.toString() !== req.user._id.toString()) {
+      return next(new ErrorHandler(403, "action not permitted"));
     }
 
-    // 2. NOW it is safe to delete
-    reviews.splice(isReviewExistIndex, 1);
+    product.reviews.splice(index, 1);
 
-    // 3. Update the total number of reviews count
-    product.numOfReviews = reviews.length;
+    product.numOfReviews = product.reviews.length;
 
-    // 4. Recalculate Rating
-    let avg = 0;
-    reviews.forEach(r => avg += r.rating);
-    product.rating = reviews.length ? avg / reviews.length : 0;
+    const totalRating = product.reviews.reduce(
+      (sum, r) => sum + r.rating,
+      0
+    );
 
-    // 5. Save the changes
+    product.rating =
+      product.reviews.length === 0
+        ? 0
+        : totalRating / product.reviews.length;
+
     await product.save({ validateBeforeSave: false });
 
     res.status(200).json({
       success: true,
-      msg: "review deleted successfully",
-      deletedReview: reviewToBeDeleted,
       product,
     });
-  } catch (error) {
-    return next(new ErrorHandler(500, error.message));
+  } catch (err) {
+    next(new ErrorHandler(500, err.message));
   }
 };

@@ -1,14 +1,19 @@
-import server from "./app.js";
+import app from "./app.js";
 import { connectDB } from "./config/db.js";
-import dotenv from "dotenv";
 
-dotenv.config({ path: "./config/uat.env" });
+const PORT = process.env.PORT || 3000;
 
-const serverStar = server.listen(process.env.PORT, async (err) => {
-  if (err) {
-    console.log(`server failed with error ${err}`);
-  } else {
+const startServer = async () => {
+  try {
     await connectDB();
-    console.log(`server is running at http://localhost:${process.env.PORT}`);
+
+    app.listen(PORT, () => {
+      console.log(`Application running on http://localhost:${PORT}`);
+    });
+  } catch (error) {
+    console.error("Startup failed:", error.message);
+    process.exit(1);
   }
-});
+};
+
+startServer();

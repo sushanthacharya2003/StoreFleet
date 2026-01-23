@@ -1,25 +1,21 @@
-import { timeStamp } from "console";
 import mongoose from "mongoose";
 
-const producSchema = new mongoose.Schema(
+const productSchema = new mongoose.Schema(
   {
     name: {
       type: String,
-      required: [true, "product name is required"],
+      required: [true, "name is required"],
       trim: true,
     },
     description: {
       type: String,
-      required: [true, "product description name is required"],
-      minLength: [
-        10,
-        "product description should be atleat 10 characters long",
-      ],
+      required: [true, "description is required"],
+      minlength: [10, "description must be at least 10 characters"],
     },
     price: {
       type: Number,
-      required: [true, "product price  is required"],
-      maxLength: [8, "price can be of maximum 8 digits"],
+      required: [true, "price is required"],
+      max: [99999999, "price exceeds allowed limit"],
     },
     rating: {
       type: Number,
@@ -27,7 +23,7 @@ const producSchema = new mongoose.Schema(
     },
     images: [
       {
-        public_id: {
+        publicId: {
           type: String,
           required: true,
         },
@@ -39,7 +35,7 @@ const producSchema = new mongoose.Schema(
     ],
     category: {
       type: String,
-      required: [true, "product category is required"],
+      required: [true, "category is required"],
       enum: [
         "Mobile",
         "Electronics",
@@ -66,15 +62,15 @@ const producSchema = new mongoose.Schema(
     },
     stock: {
       type: Number,
-      required: [true, "product stock is mandatory"],
-      maxLength: [5, "stock can be maximum 5 digits"],
+      required: [true, "stock is required"],
+      max: [99999, "stock exceeds allowed limit"],
       default: 1,
     },
     reviews: [
       {
         user: {
-          type: mongoose.Schema.ObjectId,
-          type: String,
+          type: mongoose.Schema.Types.ObjectId,
+          ref: "User",
           required: true,
         },
         name: {
@@ -95,13 +91,11 @@ const producSchema = new mongoose.Schema(
       ref: "User",
       required: true,
     },
-    createdAt: {
-      type: Date,
-      default: Date.now(),
-    },
   },
-  timeStamp
+  {
+    timestamps: true,
+  }
 );
 
-const ProductModel = mongoose.model("Product", producSchema);
-export default ProductModel;
+const Product = mongoose.model("Product", productSchema);
+export default Product;

@@ -1,193 +1,199 @@
-// Please don't change the pre-written code
-// Import the necessary modules here
+import crypto from "crypto";
 
 import { sendPasswordResetEmail } from "../../../utils/emails/passwordReset.js";
 import { sendWelcomeEmail } from "../../../utils/emails/welcomeMail.js";
 import { ErrorHandler } from "../../../utils/errorHandler.js";
-import { sendToken } from "../../../utils/sendToken.js";
+import { issueAuthToken } from "../../../utils/sendToken.js";
+
 import {
-  createNewUserRepo,
-  deleteUserRepo,
-  findUserForPasswordResetRepo,
-  findUserRepo,
-  getAllUsersRepo,
-  updateUserProfileRepo,
-  updateUserRoleAndProfileRepo,
+  saveUser,
+  removeUserById,
+  getUserForPasswordReset,
+  getUserByQuery,
+  fetchAllUsers,
+  updateUserProfileById,
+  updateUserByAdmin,
 } from "../models/user.repository.js";
-import crypto from "crypto";
 
-export const createNewUser = async (req, res, next) => {
-  const { name, email, password } = req.body;
+export const registerUser = async (req, res, next) => {
   try {
-    const newUser = await createNewUserRepo(req.body);
-    await sendToken(newUser, res, 200);
-
-    // Implement sendWelcomeEmail function to send welcome message
-    await sendWelcomeEmail(newUser);
+    const user = await saveUser(req.body);
+    issueAuthToken(user, res, 200);
+    sendWelcomeEmail(user).catch(() => {});
   } catch (err) {
     if (err.code === 11000) {
-      return next(new ErrorHandler(400, "email already registered"));
+      return next(new ErrorHandler(400, "email already in use"));
     }
-    return next(new ErrorHandler(400, err.message));
+    next(new ErrorHandler(400, err.message));
   }
-
 };
 
-export const userLogin = async (req, res, next) => {
+export const loginUser = async (req, res, next) => {
   try {
     const { email, password } = req.body;
+
     if (!email || !password) {
-      return next(new ErrorHandler(400, "please enter email/password"));
+      return next(new ErrorHandler(400, "email and password are required"));
     }
-    const user = await findUserRepo({ email }, true);
+
+    const user = await getUserByQuery({ email }, true);
     if (!user) {
-      return next(
-        new ErrorHandler(401, "user not found! register yourself now!!")
-      );
+      return next(new ErrorHandler(401, "invalid login credentials"));
     }
-    const passwordMatch = await user.comparePassword(password);
-    if (!passwordMatch) {
-      return next(new ErrorHandler(401, "Invalid email or passsword!"));
+
+    const match = await user.comparePassword(password);
+    if (!match) {
+      return next(new ErrorHandler(401, "invalid login credentials"));
     }
-    await sendToken(user, res, 200);
-  } catch (error) {
-    return next(new ErrorHandler(400, error));
+
+    issueAuthToken(user, res, 200);
+  } catch (err) {
+    next(new ErrorHandler(400, err.message));
   }
 };
 
-export const logoutUser = async (req, res, next) => {
+export const logoutCurrentUser = async (req, res) => {
   res
     .status(200)
-    .cookie("token", null, {
-      expires: new Date(Date.now()),
+    .cookie("token", "", {
+      expires: new Date(0),
       httpOnly: true,
     })
-    .json({ success: true, msg: "logout successful" });
+    .json({ success: true, message: "logged out successfully" });
 };
 
-export const forgetPassword = async (req, res, next) => {
-  // Implement feature for forget password
-    const user = await findUserRepo({ email: req.body.email });
-    if (!user) return next(new ErrorHandler(404, "user not found"));
+export const initiatePasswordReset = async (req, res, next) => {
+  try {
+    const user = await getUserByQuery({ email: req.body.email });
 
-    const resetToken = await user.getResetPasswordToken();
+    if (!user) {
+      return next(new ErrorHandler(404, "account not found"));
+    }
+
+    const resetToken = user.getResetPasswordToken();
     await user.save({ validateBeforeSave: false });
 
-    const resetURL = `${req.protocol}://${req.get("host")}/api/storefleet/user/password/reset/${resetToken}`;
-    await sendPasswordResetEmail(user, resetURL);
+    const resetLink = `${req.protocol}://${req.get(
+      "host"
+    )}/api/storefleet/user/password/reset/${resetToken}`;
 
-    res.status(200).json({ success: true, msg: "email sent" });
-};
+    await sendPasswordResetEmail(user, resetLink);
 
-export const resetUserPassword = async (req, res, next) => {
-  const hashedToken = crypto
-    .createHash("sha256")
-    .update(req.params.token)
-    .digest("hex");
-
-  const user = await findUserForPasswordResetRepo(hashedToken);
-  if (!user) return next(new ErrorHandler(400, "token expired or invalid"));
-
-  user.password = req.body.password;
-  user.resetPasswordToken = undefined;
-  user.resetPasswordExpire = undefined;
-
-  await user.save();
-  await sendToken(user, res, 200);
-};
-
-export const getUserDetails = async (req, res, next) => {
-  try {
-    const userDetails = await findUserRepo({ _id: req.user._id });
-    res.status(200).json({ success: true, userDetails });
-  } catch (error) {
-    return next(new ErrorHandler(500, error));
+    res.status(200).json({
+      success: true,
+      message: "password reset email sent",
+    });
+  } catch (err) {
+    next(new ErrorHandler(500, err.message));
   }
 };
 
-export const updatePassword = async (req, res, next) => {
-  const { currentPassword, newPassword, confirmPassword } = req.body;
+export const completePasswordReset = async (req, res, next) => {
   try {
-    if (!currentPassword) {
-      return next(new ErrorHandler(401, "pls enter current password"));
+    const hashed = crypto
+      .createHash("sha256")
+      .update(req.params.token)
+      .digest("hex");
+
+    const user = await getUserForPasswordReset(hashed);
+    if (!user) {
+      return next(new ErrorHandler(400, "token invalid or expired"));
     }
 
-    const user = await findUserRepo({ _id: req.user._id }, true);
-    const passwordMatch = await user.comparePassword(currentPassword);
-    if (!passwordMatch) {
-      return next(new ErrorHandler(401, "Incorrect current password!"));
+    user.password = req.body.password;
+    user.resetPasswordToken = undefined;
+    user.resetPasswordExpire = undefined;
+
+    await user.save();
+    issueAuthToken(user, res, 200);
+  } catch (err) {
+    next(new ErrorHandler(400, err.message));
+  }
+};
+
+export const fetchOwnProfile = async (req, res, next) => {
+  try {
+    const user = await getUserByQuery({ _id: req.user._id });
+    res.status(200).json({ success: true, user });
+  } catch (err) {
+    next(new ErrorHandler(500, err.message));
+  }
+};
+
+export const changePassword = async (req, res, next) => {
+  try {
+    const { currentPassword, newPassword, confirmPassword } = req.body;
+
+    const user = await getUserByQuery({ _id: req.user._id }, true);
+
+    const match = await user.comparePassword(currentPassword);
+    if (!match) {
+      return next(new ErrorHandler(401, "current password incorrect"));
     }
 
     if (!newPassword || newPassword !== confirmPassword) {
-      return next(
-        new ErrorHandler(401, "mismatch new password and confirm password!")
-      );
+      return next(new ErrorHandler(400, "password confirmation failed"));
     }
 
     user.password = newPassword;
     await user.save();
-    await sendToken(user, res, 200);
-  } catch (error) {
-    return next(new ErrorHandler(400, error));
+
+    issueAuthToken(user, res, 200);
+  } catch (err) {
+    next(new ErrorHandler(400, err.message));
   }
 };
 
-export const updateUserProfile = async (req, res, next) => {
-  const { name, email } = req.body;
+export const updateOwnProfile = async (req, res, next) => {
   try {
-    const updatedUserDetails = await updateUserProfileRepo(req.user._id, {
-      name,
-      email,
-    });
-    res.status(201).json({ success: true, updatedUserDetails });
-  } catch (error) {
-    return next(new ErrorHandler(400, error));
+    const updated = await updateUserProfileById(req.user._id, req.body);
+    res.status(200).json({ success: true, updated });
+  } catch (err) {
+    next(new ErrorHandler(400, err.message));
   }
 };
 
-// admin controllers
-export const getAllUsers = async (req, res, next) => {
+export const fetchAllUsersForAdmin = async (req, res, next) => {
   try {
-    const allUsers = await getAllUsersRepo();
-    res.status(200).json({ success: true, allUsers });
-  } catch (error) {
-    return next(new ErrorHandler(500, error));
+    const users = await fetchAllUsers();
+    res.status(200).json({ success: true, users });
+  } catch (err) {
+    next(new ErrorHandler(500, err.message));
   }
 };
 
-export const getUserDetailsForAdmin = async (req, res, next) => {
+export const fetchUserById = async (req, res, next) => {
   try {
-    const userDetails = await findUserRepo({ _id: req.params.id });
-    if (!userDetails) {
-      return res
-        .status(400)
-        .json({ success: false, msg: "no user found with provided id" });
+    const user = await getUserByQuery({ _id: req.params.id });
+    if (!user) {
+      return next(new ErrorHandler(404, "user not found"));
     }
-    res.status(200).json({ success: true, userDetails });
-  } catch (error) {
-    return next(new ErrorHandler(500, error));
+    res.status(200).json({ success: true, user });
+  } catch (err) {
+    next(new ErrorHandler(500, err.message));
   }
 };
 
-export const deleteUser = async (req, res, next) => {
+export const removeUser = async (req, res, next) => {
   try {
-    const deletedUser = await deleteUserRepo(req.params.id);
-    if (!deletedUser) {
-      return res
-        .status(400)
-        .json({ success: false, msg: "no user found with provided id" });
+    const removed = await removeUserById(req.params.id);
+    if (!removed) {
+      return next(new ErrorHandler(404, "user not found"));
     }
-
-    res
-      .status(200)
-      .json({ success: true, msg: "user deleted successfully", deletedUser });
-  } catch (error) {
-    return next(new ErrorHandler(400, error));
+    res.status(200).json({ success: true, removed });
+  } catch (err) {
+    next(new ErrorHandler(400, err.message));
   }
 };
 
-export const updateUserProfileAndRole = async (req, res, next) => {
-  const user = await updateUserRoleAndProfileRepo(req.params.id, req.body);
-  if (!user) return next(new ErrorHandler(404, "user not found"));
-  res.status(200).json({ success: true, user });
+export const modifyUserRole = async (req, res, next) => {
+  try {
+    const updated = await updateUserByAdmin(req.params.id, req.body);
+    if (!updated) {
+      return next(new ErrorHandler(404, "user not found"));
+    }
+    res.status(200).json({ success: true, updated });
+  } catch (err) {
+    next(new ErrorHandler(400, err.message));
+  }
 };

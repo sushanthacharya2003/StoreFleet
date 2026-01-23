@@ -1,56 +1,72 @@
-// Please don't change the pre-written code
-// Import the necessary modules here
-
 import express from "express";
 import {
-  createNewUser,
-  deleteUser,
-  forgetPassword,
-  getAllUsers,
-  getUserDetails,
-  getUserDetailsForAdmin,
-  logoutUser,
-  resetUserPassword,
-  updatePassword,
-  updateUserProfile,
-  updateUserProfileAndRole,
-  userLogin,
+  registerUser,
+  loginUser,
+  logoutCurrentUser,
+  initiatePasswordReset,
+  completePasswordReset,
+  fetchOwnProfile,
+  changePassword,
+  updateOwnProfile,
+  fetchAllUsers,
+  fetchUserById,
+  removeUser,
+  modifyUserRole,
 } from "../controller/user.controller.js";
-import { auth, authByUserRole } from "../../../middlewares/auth.js";
+
+import {
+  verifySession,
+  restrictToRoles,
+} from "../../../middlewares/auth.js";
 
 const router = express.Router();
 
-// User POST Routes
-router.route("/signup").post(createNewUser);
-router.route("/login").post(userLogin);
-router.route("/password/forget").post(forgetPassword);
 
-// User PUT Routes
-router.route("/password/reset/:token").put(resetUserPassword);
-router.route("/password/update").put(auth, updatePassword);
-router.route("/profile/update").put(auth, updateUserProfile);
+router.post("/signup", registerUser);
 
-// User GET Routes
-router.route("/details").get(auth, getUserDetails);
-router.route("/logout").get(auth, logoutUser);
+router.post("/login", loginUser);
 
-// Admin GET Routes
-router.route("/admin/allusers").get(auth, authByUserRole("admin"), getAllUsers);
-router
-  .route("/admin/details/:id")
-  .get(auth, authByUserRole("admin"), getUserDetailsForAdmin);
+router.get("/logout", verifySession, logoutCurrentUser);
 
-// Admin DELETE Routes
-router
-  .route("/admin/delete/:id")
-  .delete(auth, authByUserRole("admin"), deleteUser);
 
-// Admin PUT Routes
-// Implement route for updating role of other users
-// Write your code here
-router
-.route("/admin/update/:id")
-.put(auth, authByUserRole("admin"), updateUserProfileAndRole);
+router.post("/password/forgot", initiatePasswordReset);
 
+router.put("/password/reset/:token", completePasswordReset);
+
+router.put("/password/update", verifySession, changePassword);
+
+
+router.get("/profile", verifySession, fetchOwnProfile);
+
+router.put("/profile", verifySession, updateOwnProfile);
+
+
+router.get(
+  "/admin/users",
+  verifySession,
+  restrictToRoles("admin"),
+  fetchAllUsers
+);
+
+router.get(
+  "/admin/users/:id",
+  verifySession,
+  restrictToRoles("admin"),
+  fetchUserById
+);
+
+router.delete(
+  "/admin/users/:id",
+  verifySession,
+  restrictToRoles("admin"),
+  removeUser
+);
+
+router.put(
+  "/admin/users/:id",
+  verifySession,
+  restrictToRoles("admin"),
+  modifyUserRole
+);
 
 export default router;

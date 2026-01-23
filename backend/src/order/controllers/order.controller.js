@@ -1,15 +1,25 @@
-// Please don't change the pre-written code
-// Import the necessary modules here
-
-import { createNewOrderRepo } from "../model/order.repository.js";
 import { ErrorHandler } from "../../../utils/errorHandler.js";
+import { saveOrder } from "../model/order.repository.js";
 
-// Write your code here for placing a new order
-export const createNewOrder = async (req, res, next) => {
-  const order = await createNewOrderRepo({
-    ...req.body,
-    user: req.user._id,
-    paidAt: Date.now(),
-  });
-  res.status(201).json({ success: true, order });
+export const placeOrder = async (req, res, next) => {
+  try {
+    const payload = {
+      ...req.body,
+      user: req.user._id,
+      paidAt: Date.now(),
+    };
+
+    const order = await saveOrder(payload);
+
+    if (!order) {
+      return next(new ErrorHandler(400, "order creation failed"));
+    }
+
+    res.status(201).json({
+      success: true,
+      order,
+    });
+  } catch (err) {
+    next(new ErrorHandler(500, err.message));
+  }
 };

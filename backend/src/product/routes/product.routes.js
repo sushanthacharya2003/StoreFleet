@@ -1,38 +1,32 @@
 import express from "express";
+
 import {
-  addNewProduct,
-  deleteProduct,
-  deleteReview,
-  getAllProducts,
-  getAllReviewsOfAProduct,
-  getProductDetails,
-  rateProduct,
-  updateProduct,
+  createProduct,
+  fetchProducts,
+  modifyProduct,
+  removeProduct,
+  fetchProductDetails,
+  submitReview,
+  fetchProductReviews,
+  removeReview,
 } from "../controllers/product.controller.js";
-import { auth, authByUserRole } from "../../../middlewares/auth.js";
+
+import {
+  verifySession,
+  restrictToRoles,
+} from "../../../middlewares/auth.js";
 
 const router = express.Router();
 
-// GET Routes
-router.route("/products").get(getAllProducts);
-router.route("/details/:id").get(getProductDetails);
-router.route("/reviews/:id").get(getAllReviewsOfAProduct);
+router.get("/", fetchProducts);
+router.get("/:id", fetchProductDetails);
+router.get("/:id/reviews", fetchProductReviews);
 
-// POST Routes
-// admin-only
-router.route("/add").post(auth, authByUserRole("admin"), addNewProduct);
-router.route("/update/:id").put(auth, authByUserRole("admin"), updateProduct);
+router.put("/:id/review", verifySession, submitReview);
+router.delete("/review", verifySession, removeReview);
 
-// DELETE ROUTE
-// Admin only
-router
-  .route("/delete/:id")
-  .delete(auth, authByUserRole("admin"), deleteProduct);
-
-// POST Routes User
-router.route("/rate/:id").put(auth, rateProduct);
-
-// DELETE Routes User
-router.route("/review/delete").delete(auth, deleteReview);
+router.post("/", verifySession, restrictToRoles("admin"), createProduct);
+router.put("/:id", verifySession, restrictToRoles("admin"), modifyProduct);
+router.delete("/:id", verifySession, restrictToRoles("admin"), removeProduct);
 
 export default router;

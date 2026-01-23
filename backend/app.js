@@ -1,28 +1,26 @@
 import express from "express";
 import dotenv from "dotenv";
 import path from "path";
-import productRoutes from "./src/product/routes/product.routes.js";
-import {
-  errorHandlerMiddleware,
-  handleUncaughtError,
-} from "./middlewares/errorHandlerMiddleware.js";
-import userRoutes from "./src/user/routes/user.routes.js";
 import cookieParser from "cookie-parser";
-import orderRoutes from "./src/order/routes/order.routes.js";
 
-const configPath = path.resolve("backend", "config", "uat.env");
-dotenv.config({ path: configPath });
+import productRouter from "./src/product/routes/product.routes.js";
+import userRouter from "./src/user/routes/user.routes.js";
+import orderRouter from "./src/order/routes/order.routes.js";
 
-const app = express();
-app.use(express.json());
-app.use(cookieParser());
+import { globalErrorHandler } from "./middlewares/errorHandlerMiddleware.js";
 
-// configure routes
-app.use("/api/storefleet/product", productRoutes);
-app.use("/api/storefleet/user", userRoutes);
-app.use("/api/storefleet/order", orderRoutes);
+const envFilePath = path.resolve("backend", "config", "uat.env");
+dotenv.config({ path: envFilePath });
 
-// errorHandlerMiddleware
-app.use(errorHandlerMiddleware);
+const application = express();
 
-export default app;
+application.use(express.json());
+application.use(cookieParser());
+
+application.use("/api/storefleet/products", productRouter);
+application.use("/api/storefleet/users", userRouter);
+application.use("/api/storefleet/orders", orderRouter);
+
+application.use(globalErrorHandler);
+
+export default application;

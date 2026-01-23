@@ -1,25 +1,35 @@
 import jwt from "jsonwebtoken";
+import User from "../src/user/models/user.schema.js";
 import { ErrorHandler } from "../utils/errorHandler.js";
-import UserModel from "../src/user/models/user.schema.js";
 
-export const auth = async (req, res, next) => {
-  const { token } = req.cookies;
-  if (!token) {
-    return next(new ErrorHandler(401, "login to access this route!"));
+export const verifySession = async (req, res, next) => {
+  try {
+    const sessionToken = req.cookies?.token;
+
+    if (!sessionToken) {
+      return next(new ErrorHandler(401, "authentication required"));
+    }
+
+    const payload = jwt.verify(sessionToken, process.env.JWT_Secret);
+    const currentUser = await User.findById(payload.id);
+
+    if (!currentUser) {
+      return next(new ErrorHandler(401, "invalid authentication token"));
+    }
+
+    req.user = currentUser;
+    next();
+  } catch (err) {
+    return next(new ErrorHandler(401, "authentication failed"));
   }
-  const decodedData = await jwt.verify(token, process.env.JWT_Secret);
-  req.user = await UserModel.findById(decodedData.id);
-  next();
 };
-
-export const authByUserRole = (...roles) => {
-  // fix this middleware for admin access only
-  return async (req, res, next) => {
-    if (!roles.includes(req.user.role)) {
+export const restrictToRoles = (...allowedRoles) => {
+  return (req, res, next) => {
+    if (!allowedRoles.includes(req.user.role)) {
       return next(
         new ErrorHandler(
           403,
-          `Role: ${req.user.role} is not allowed to access this resource`
+          `Access denied for role: ${req.user.role}`
         )
       );
     }

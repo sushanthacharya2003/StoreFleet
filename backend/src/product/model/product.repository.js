@@ -1,33 +1,28 @@
-import ProductModel from "./product.schema.js";
+import Product from "./product.schema.js";
 
-export const addNewProductRepo = async (product) => {
-  return await new ProductModel(product).save();
+export const saveProduct = async (payload) => {
+  return new Product(payload).save();
 };
 
-export const getAllProductsRepo = async () => {
-  return await ProductModel.find({});
+export const fetchAllProducts = async () => {
+  return Product.find({});
 };
 
-export const updateProductRepo = async (_id, updatedData) => {
-  return await ProductModel.findByIdAndUpdate(_id, updatedData, {
+export const updateProductById = async (id, data) => {
+  return Product.findByIdAndUpdate(id, data, {
     new: true,
     runValidators: true,
-    useFindAndModify: true,
   });
 };
 
-export const deleProductRepo = async (_id) => {
-  return await ProductModel.findByIdAndDelete(_id);
+export const removeProductById = async (id) => {
+  return Product.findByIdAndDelete(id);
 };
 
-export const getProductDetailsRepo = async (_id) => {
-  return await ProductModel.findById(_id);
+export const fetchProductById = async (id) => {
+  return Product.findById(id);
 };
 
-export const getTotalCountsOfProduct = async () => {
-  return await ProductModel.countDocuments();
-};
-
-export const findProductRepo = async (productId) => {
-  return await ProductModel.findById(productId);
+export const countProducts = async () => {
+  return Product.countDocuments();
 };
