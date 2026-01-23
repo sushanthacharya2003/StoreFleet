@@ -17,12 +17,10 @@ const app = express();
 app.use(express.json());
 app.use(cookieParser());
 
-// configure routes
 app.use("/api/storefleet/product", productRoutes);
 app.use("/api/storefleet/user", userRoutes);
 app.use("/api/storefleet/order", orderRoutes);
 
-// errorHandlerMiddleware
 app.use(errorHandlerMiddleware);
 
 export default app;

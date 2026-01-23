@@ -1,4 +1,3 @@
-// create token and save into cookie
 
 export const sendToken = async (user, res, statusCode) => {
   const token = user.getJWTToken();

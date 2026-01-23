@@ -1,18 +1,19 @@
 import mongoose from "mongoose";
 import dotenv from "dotenv";
+import path from "path";
 
-dotenv.config({path: './uat.env'});
+dotenv.config({
+  path: path.resolve("backend", "config", "uat.env"),
+});
 
 export const connectDB = async () => {
   try {
     console.log("db connecting...");
-    const res = await mongoose.connect(process.env.mongoURI, {
-      useNewUrlParser: true,
-      useUnifiedTopology: true,
-    });
+    const res = await mongoose.connect(process.env.mongoURI);
     console.log(`mongodb connected with server ${res.connection.host}`);
   } catch (error) {
     console.log("mongodb connection failed!");
-    console.log(error);
+    console.log(error.message);
+    process.exit(1);
   }
 };

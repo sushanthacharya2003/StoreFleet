@@ -1,5 +1,3 @@
-// Please don't change the pre-written code
-// Import the necessary modules here
 
 import { sendPasswordResetEmail } from "../../../utils/emails/passwordReset.js";
 import { sendWelcomeEmail } from "../../../utils/emails/welcomeMail.js";
@@ -22,7 +20,6 @@ export const createNewUser = async (req, res, next) => {
     const newUser = await createNewUserRepo(req.body);
     await sendToken(newUser, res, 200);
 
-    // Implement sendWelcomeEmail function to send welcome message
     await sendWelcomeEmail(newUser);
   } catch (err) {
     if (err.code === 11000) {
@@ -66,7 +63,6 @@ export const logoutUser = async (req, res, next) => {
 };
 
 export const forgetPassword = async (req, res, next) => {
-  // Implement feature for forget password
     const user = await findUserRepo({ email: req.body.email });
     if (!user) return next(new ErrorHandler(404, "user not found"));
 
@@ -145,7 +141,6 @@ export const updateUserProfile = async (req, res, next) => {
   }
 };
 
-// admin controllers
 export const getAllUsers = async (req, res, next) => {
   try {
     const allUsers = await getAllUsersRepo();

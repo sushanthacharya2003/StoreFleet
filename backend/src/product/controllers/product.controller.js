@@ -1,5 +1,3 @@
-// Please don't change the pre-written code
-// Import the necessary modules here
 
 import { ErrorHandler } from "../../../utils/errorHandler.js";
 import {
@@ -148,8 +146,6 @@ export const deleteReview = async (req, res, next) => {
   try {
     const { productId, reviewId } = req.query;
 
-    // ... basic checks stay the same ...
-
     const product = await findProductRepo(productId);
     if (!product) return next(new ErrorHandler(400, "Product not found!"));
 
@@ -165,23 +161,18 @@ export const deleteReview = async (req, res, next) => {
 
     const reviewToBeDeleted = reviews[isReviewExistIndex];
 
-    // 1. ALWAYS check permission BEFORE modifying the array
     if (reviewToBeDeleted.user.toString() !== req.user._id.toString()) {
       return next(new ErrorHandler(403, "not allowed"));
     }
 
-    // 2. NOW it is safe to delete
     reviews.splice(isReviewExistIndex, 1);
 
-    // 3. Update the total number of reviews count
     product.numOfReviews = reviews.length;
 
-    // 4. Recalculate Rating
     let avg = 0;
     reviews.forEach(r => avg += r.rating);
     product.rating = reviews.length ? avg / reviews.length : 0;
 
-    // 5. Save the changes
     await product.save({ validateBeforeSave: false });
 
     res.status(200).json({
